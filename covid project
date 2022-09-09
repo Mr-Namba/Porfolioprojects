@@ -1,0 +1,129 @@
+--select *
+--from [portforlio project]..coviddeaths
+--order by 3,4
+
+select *
+from [portforlio project]..covidvaccinations
+where continent is not null
+order by 3,4
+
+select location, date, total_cases ,new_cases, total_deaths, population
+from [portforlio project]..coviddeaths
+where continent is not null
+order by 1,2
+
+--looking at total case vs total
+select location, date, total_cases ,new_cases, total_deaths,  (cast(total_deaths as float)/cast(total_cases as float ))*100 as Death_percent
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+order by 1,2
+
+--Total cases VS population
+select location, total_cases,date , population,  (cast(total_cases as float)/cast(population as float ))*100 as affected_population
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+Group by location, population 
+order by 1,2
+
+--looking at countries with highest infection rate 
+select location, MAX(total_cases) as highestinfectioncount , population,  MAX((cast(total_cases as float)/cast(population as float )))*100 as affected_population
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+Group by location, population 
+order by affected_population desc
+
+--lookin at total death count
+select location, MAX(total_deaths) as totaldeathcount 
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+Group by location
+order by totaldeathcount desc
+
+--lets break things down by continent 
+
+
+--continents with highest deathcount per population 
+
+
+select continent, MAX(total_deaths) as totaldeathcount 
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+Group by continent
+order by totaldeathcount desc
+
+--global numbers
+select  date, sum(new_cases) as total_case,sum(new_deaths) as total_deaths , sum(cast(total_deaths as float))/sum(cast(total_cases as float ))*100 as Death_percent
+from [portforlio project]..coviddeaths
+--where location like '%states%'
+where continent is not null
+GROUP BY date 
+order by 1,2
+
+-- looking at total population vs vaccination 
+--using cte 
+with popvsvac as
+(
+select
+dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(CONVERT(bigint, vac.new_vaccinations)) over (partition by dea.location ) 
+as rollingpeoplevaccinated
+ from 
+[portforlio project]..coviddeaths dea
+JOIN  [portforlio project]..covidvaccinations vac
+on dea.location = vac.location 
+and dea.date = vac.date 
+where dea.continent is not null
+--order by 2,3
+)
+
+select * , (rollingpeoplevaccinated/population)*100
+from popvsvac
+
+--temp table
+create table #percentpopulationvaccinated
+
+(
+    continent nvarchar(MAX),
+    location nvarchar(max),
+    date datetime,
+    population numeric,
+    new_vaccinations numeric,
+    rollingpeoplevaccinated numeric
+)
+
+
+insert into #percentpopulationvaccinated
+select
+dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(CONVERT(bigint, vac.new_vaccinations)) over (partition by dea.location ) 
+as rollingpeoplevaccinated
+ from 
+[portforlio project]..coviddeaths dea
+JOIN  [portforlio project]..covidvaccinations vac
+on dea.location = vac.location 
+and dea.date = vac.date 
+--where dea.continent is not null
+--order by 2,3
+select * , (rollingpeoplevaccinated/population)*100
+from #percentpopulationvaccinated
+
+--creating view to store data for later  visualization 
+
+create view percentpopulationvaccinated as 
+
+select
+dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations,
+sum(CONVERT(bigint, vac.new_vaccinations)) over (partition by dea.location ) 
+as rollingpeoplevaccinated
+ from 
+[portforlio project]..coviddeaths dea
+JOIN  [portforlio project]..covidvaccinations vac
+on dea.location = vac.location 
+and dea.date = vac.date 
+where dea.continent is not null
+--order by 2,3
